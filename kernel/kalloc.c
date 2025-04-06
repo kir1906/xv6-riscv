@@ -12,30 +12,37 @@
 void freerange(void *pa_start, void *pa_end);
 
 extern char end[]; // first address after kernel.
+                   // Address that is after Kernel code, data, bss
                    // defined by kernel.ld.
 
-struct run {
+struct run
+{
   struct run *next;
 };
 
-struct {
-  struct spinlock lock;
-  struct run *freelist;
+struct
+{
+  struct spinlock lock; // Lock to ensure thread safety when modifying the free list
+  struct run *freelist; // Pointer to the head of the linked list of free memory pages
 } kmem;
 
-void
-kinit()
+void kinit()
 {
   initlock(&kmem.lock, "kmem");
-  freerange(end, (void*)PHYSTOP);
+  freerange(end, (void *)PHYSTOP); // Freeing to whole memory till PHYSTOP
+  // So cpus can use them end is the first address defiend by kernel.ld
+  // So after end we can use all the address for our memory
 }
 
-void
-freerange(void *pa_start, void *pa_end)
+// Take starting and ending address as the input and
+void freerange(void *pa_start, void *pa_end)
 {
   char *p;
-  p = (char*)PGROUNDUP((uint64)pa_start);
-  for(; p + PGSIZE <= (char*)pa_end; p += PGSIZE)
+  // we cannot free perticular addresses we need to free the pages
+  // which contains the pa_start till we come to the page that includes
+  // the pa_end
+  p = (char *)PGROUNDUP((uint64)pa_start);
+  for (; p + PGSIZE <= (char *)pa_end; p += PGSIZE)
     kfree(p);
 }
 
@@ -43,22 +50,22 @@ freerange(void *pa_start, void *pa_end)
 // which normally should have been returned by a
 // call to kalloc().  (The exception is when
 // initializing the allocator; see kinit above.)
-void
-kfree(void *pa)
+void kfree(void *pa)
 {
   struct run *r;
 
-  if(((uint64)pa % PGSIZE) != 0 || (char*)pa < end || (uint64)pa >= PHYSTOP)
+  if (((uint64)pa % PGSIZE) != 0 || (char *)pa < end || (uint64)pa >= PHYSTOP)
     panic("kfree");
 
   // Fill with junk to catch dangling refs.
   memset(pa, 1, PGSIZE);
 
-  r = (struct run*)pa;
-
+  r = (struct run *)pa;
+  // while freeing the page we need to acquire kmem lock
+  // because it's a critical section ( can lead to race condition and for safe concurrent access )
   acquire(&kmem.lock);
-  r->next = kmem.freelist;
-  kmem.freelist = r;
+  r->next = kmem.freelist; // Adding in front of linklist of freepages
+  kmem.freelist = r;       //  Making it a as new head
   release(&kmem.lock);
 }
 
@@ -71,12 +78,13 @@ kalloc(void)
   struct run *r;
 
   acquire(&kmem.lock);
-  r = kmem.freelist;
-  if(r)
-    kmem.freelist = r->next;
+  r = kmem.freelist; // Remember freelist is linklist of free page addresses
+  if (r)
+    kmem.freelist = r->next; // removing that page from linklist
   release(&kmem.lock);
 
-  if(r)
-    memset((char*)r, 5, PGSIZE); // fill with junk
-  return (void*)r;
+  if (r)
+    memset((char *)r, 5, PGSIZE); // fill with junk
+  return (void *)r;               // Returning the allocated page address ( it's not whole page it's a first
+  // address of that page )
 }

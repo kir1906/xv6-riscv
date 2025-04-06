@@ -21,8 +21,8 @@ kvmmake(void)
 {
   pagetable_t kpgtbl;
 
-  kpgtbl = (pagetable_t) kalloc();
-  memset(kpgtbl, 0, PGSIZE);
+  kpgtbl = (pagetable_t) kalloc(); // Allocating the memory size of a page
+  memset(kpgtbl, 0, PGSIZE); // Filling it with junk or emptying
 
   // uart registers
   kvmmap(kpgtbl, UART0, UART0, PGSIZE, PTE_R | PTE_W);
@@ -41,6 +41,8 @@ kvmmake(void)
 
   // map the trampoline for trap entry/exit to
   // the highest virtual address in the kernel.
+  // Last page in virtual memory is allocated to TRAMPOLINE
+  // TRAMPOLINE is MAXVA - PAGESIZE and giving our trampoline function pa address
   kvmmap(kpgtbl, TRAMPOLINE, (uint64)trampoline, PGSIZE, PTE_R | PTE_X);
 
   // allocate and map a kernel stack for each process.
@@ -89,14 +91,19 @@ walk(pagetable_t pagetable, uint64 va, int alloc)
     panic("walk");
 
   for(int level = 2; level > 0; level--) {
-    pte_t *pte = &pagetable[PX(level, va)];
-    if(*pte & PTE_V) {
-      pagetable = (pagetable_t)PTE2PA(*pte);
+    pte_t *pte = &pagetable[PX(level, va)]; // PX will return the 9 bits of that level
+                                            // Using that we'll get pte corresponding to that 9 bit from
+                                            // current pagetable
+    if(*pte & PTE_V) { // checks if the entry exsists or not
+      pagetable = (pagetable_t)PTE2PA(*pte); // PTE2PA will get that pa without flags and offset bits
     } else {
-      if(!alloc || (pagetable = (pde_t*)kalloc()) == 0)
+      if(!alloc || (pagetable = (pde_t*)kalloc()) == 0){ // this checks that if it's allowed to add a 
+                                                        //  entry in pagetable when it doesn't exists and
+                                                        // makes a new empty pagetable
         return 0;
+      }
       memset(pagetable, 0, PGSIZE);
-      *pte = PA2PTE(pagetable) | PTE_V;
+      *pte = PA2PTE(pagetable) | PTE_V; // Adds the pa to that empty pte in old pagetable (current level's pagetable)
     }
   }
   return &pagetable[PX(0, va)];
@@ -146,27 +153,28 @@ mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)
   uint64 a, last;
   pte_t *pte;
 
-  if((va % PGSIZE) != 0)
+  if((va % PGSIZE) != 0) //  va should be the first va of that page
     panic("mappages: va not aligned");
 
-  if((size % PGSIZE) != 0)
+  if((size % PGSIZE) != 0) // Size also needed to be in multiple of PGSIZE
     panic("mappages: size not aligned");
 
   if(size == 0)
     panic("mappages: size");
   
   a = va;
-  last = va + size - PGSIZE;
+  last = va + size - PGSIZE; //  this counts the last va should be
   for(;;){
-    if((pte = walk(pagetable, a, 1)) == 0)
+    if((pte = walk(pagetable, a, 1)) == 0) // This adds the new pagetable and ptes throughout all levels 
       return -1;
-    if(*pte & PTE_V)
+    if(*pte & PTE_V) // We are adding new entry so it should have any valid pa on last level (level zero)
       panic("mappages: remap");
-    *pte = PA2PTE(pa) | perm | PTE_V;
+    *pte = PA2PTE(pa) | perm | PTE_V; // PA2PTE think of it as it retrieves FRAME Number from that pa  
+                                      // This will add our pa in that pagetable entry with flags
     if(a == last)
       break;
-    a += PGSIZE;
-    pa += PGSIZE;
+    a += PGSIZE;  // Jumps to next page
+    pa += PGSIZE; // Jumps to next frame
   }
   return 0;
 }

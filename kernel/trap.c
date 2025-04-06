@@ -26,7 +26,8 @@ trapinit(void)
 void
 trapinithart(void)
 {
-  w_stvec((uint64)kernelvec);
+  w_stvec((uint64)kernelvec); // We are in kernel mode so interruptes will come from kernel mode
+                              // kernelvec is trap handling function when interruptes comes from kernel
 }
 
 //
