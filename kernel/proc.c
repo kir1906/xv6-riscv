@@ -93,7 +93,7 @@ int allocpid()
 {
   int pid;
 
-  acquire(&pid_lock);
+  acquire(&pid_lock); // Atomicity is required for this operation
   pid = nextpid;
   nextpid = nextpid + 1;
   release(&pid_lock);
@@ -103,7 +103,7 @@ int allocpid()
 
 // Look in the process table for an UNUSED proc.
 // If found, initialize state required to run in the kernel,
-// and return with p->lock held.
+// and return  p->lock held.
 // If there are no free procs, or a memory allocation fails, return 0.
 static struct proc *
 allocproc(void)
@@ -111,7 +111,7 @@ allocproc(void)
   struct proc *p;
 
   for (p = proc; p < &proc[NPROC]; p++)
-  {
+  { // Interating thorough Process table to pick first free(Unused) prcoess
     acquire(&p->lock);
     if (p->state == UNUSED)
     {
@@ -126,10 +126,10 @@ allocproc(void)
 
 found:
   p->pid = allocpid();
-  p->state = USED;
+  p->state = USED; // Changing the status of the Process to Using
 
   // Allocate a trapframe page.
-  if ((p->trapframe = (struct trapframe *)kalloc()) == 0)
+  if ((p->trapframe = (struct trapframe *)kalloc()) == 0) // allocating a page
   {
     freeproc(p);
     release(&p->lock);
@@ -148,10 +148,10 @@ found:
   // Set up new context to start executing at forkret,
   // which returns to user space.
   memset(&p->context, 0, sizeof(p->context));
-  p->context.ra = (uint64)forkret;
-  p->context.sp = p->kstack + PGSIZE;
+  p->context.ra = (uint64)forkret;    // Setting the return address to the forkret function's address
+  p->context.sp = p->kstack + PGSIZE; // In xv6 stack grows downward so that's why + PGSIZE
 
-  return p;
+  return p; // aLL set to return the process
 }
 
 // free a proc structure and the data hanging from it,
@@ -184,7 +184,7 @@ proc_pagetable(struct proc *p)
   pagetable_t pagetable;
 
   // An empty page table.
-  pagetable = uvmcreate();
+  pagetable = uvmcreate(); // Allocating an empty pagetable
   if (pagetable == 0)
     return 0;
 
@@ -238,7 +238,7 @@ void userinit(void)
 {
   struct proc *p;
 
-  p = allocproc();
+  p = allocproc(); // Allocating the free process
   initproc = p;
 
   // allocate one user page and copy initcode's instructions
@@ -253,7 +253,7 @@ void userinit(void)
   safestrcpy(p->name, "initcode", sizeof(p->name));
   p->cwd = namei("/");
 
-  p->state = RUNNABLE;
+  p->state = RUNNABLE; // Ready to be scheduled
 
   release(&p->lock);
 }

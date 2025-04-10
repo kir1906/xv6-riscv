@@ -368,16 +368,16 @@ typedef uint64 *pagetable_t; // 512 PTEs
 #define PTE_U (1L << 4) // user can access
 
 // shift a physical address to the right place for a PTE.
-#define PA2PTE(pa) ((((uint64)pa) >> 12) << 10)
+#define PA2PTE(pa) ((((uint64)pa) >> 12) << 10) // Adding flags and removing offset
 
-#define PTE2PA(pte) (((pte) >> 10) << 12)
+#define PTE2PA(pte) (((pte) >> 10) << 12) // Converting the pte to Physical Address abd removing flags
 
 #define PTE_FLAGS(pte) ((pte) & 0x3FF)
 
 // extract the three 9-bit page table indices from a virtual address.
-#define PXMASK 0x1FF // 9 bits
-#define PXSHIFT(level) (PGSHIFT + (9 * (level)))
-#define PX(level, va) ((((uint64)(va)) >> PXSHIFT(level)) & PXMASK)
+#define PXMASK 0x1FF                                                // 9 bits
+#define PXSHIFT(level) (PGSHIFT + (9 * (level)))                    // first 12 (PGSHIFT) are the for of Offset
+#define PX(level, va) ((((uint64)(va)) >> PXSHIFT(level)) & PXMASK) // This whill give 9 bits of that level
 
 // one beyond the highest possible virtual address.
 // MAXVA is actually one bit less than the max allowed by
