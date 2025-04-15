@@ -480,10 +480,12 @@ void scheduler(void)
         // before jumping back to us.
         p->state = RUNNING;
         c->proc = p;
-        swtch(&c->context, &p->context);
+        swtch(&c->context, &p->context); // Context switching
 
         // Process is done running for now.
         // It should have changed its p->state before coming back.
+        // we'll comeback this after calling that sched() function
+        // Either from Exit or yield
         c->proc = 0;
         found = 1;
       }
@@ -536,6 +538,7 @@ void yield(void)
 
 // A fork child's very first scheduling by scheduler()
 // will swtch to forkret.
+// Using that return address ( for first process )
 void forkret(void)
 {
   static int first = 1;
@@ -548,6 +551,7 @@ void forkret(void)
     // File system initialization must be run in the context of a
     // regular process (e.g., because it calls sleep), and thus cannot
     // be run from main().
+    // initializing super block for file system to use
     fsinit(ROOTDEV);
 
     first = 0;

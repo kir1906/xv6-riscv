@@ -4,10 +4,11 @@
 # 
 # Save current registers in old. Load from new.	
 
-
+# a0 means first argument(struct context *old)
+# a1 means second argument(struct context *new)
 .globl swtch
 swtch:
-        sd ra, 0(a0)
+        sd ra, 0(a0) 
         sd sp, 8(a0)
         sd s0, 16(a0)
         sd s1, 24(a0)
